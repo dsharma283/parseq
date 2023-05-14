@@ -75,10 +75,10 @@ def predict_results(model, transform, images):
 
 def process_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--checkpoint', help="Pretrained model path", required=True)
-    parser.add_argument('--images', help='Images to read', required=True)
-    parser.add_argument('--output', help='Output directory to save the predictions', required=False)
-    parser.add_argument('--language',
+    parser.add_argument('--checkpoint', '-c', help="Pretrained model path", required=True)
+    parser.add_argument('--images', '-i', help='Images to read', required=True)
+    parser.add_argument('--output', '-o', help='Output directory to save the predictions', required=False)
+    parser.add_argument('--language', '-l',
                         help='The language script in use, supported: Devanagari',
                         default="Devanagari")
     args = parser.parse_args()
