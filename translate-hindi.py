@@ -1,19 +1,38 @@
 import argparse
 import string
-import sys
-from dataclasses import dataclass
-from typing import List
+import os
+from typing import Tuple
 import torch
-from tqdm import tqdm
-from parseq.strhub.data.module import SceneTextDataModule
-from parseq.strhub.models.utils import load_from_checkpoint
-from nltk import edit_distance
+from strhub.data.module import SceneTextDataModule
+from strhub.models.utils import load_from_checkpoint
+from torchvision import transforms as T
+from PIL import Image
 
-device = "cuda"
-checkpoint = checkpoint_path
-model = load_from_checkpoint(checkpoint).eval().to(device)
 
-def get_transform(img_size: Tuple[int], augment: bool = False, rotation: int = 0):
+device = "cpu"
+if torch.cuda.is_available() is True:
+    device = "cuda"
+
+
+charsets = [
+    "अआइईउऊऋऌऍऎएऐऑऒओऔकखगघङचछजझञटठडढणतथदधनऩपफबभमयरऱलळऴवशषसह़ऽािीुूृॄॅॆेैॉॊोौ्ॐ॒॑॓॔ॕॖॠॡॢॣ।॥०१२३४५६७८९॰ॱॲॻॿ",
+    None
+]
+
+
+def get_charset(lang):
+    if lang == 'Devanagari':
+        return charsets[0]
+    else:
+        return charsets[-1]
+
+
+def save_output(op_path, results):
+    if op_path is None:
+        print(results)
+
+
+def get_transform(img_size:Tuple[int], augment:bool = False, rotation:int = 0):
     transforms = []
     if augment:
         from .augment import rand_augment_transform
@@ -28,17 +47,51 @@ def get_transform(img_size: Tuple[int], augment: bool = False, rotation: int = 0
     return T.Compose(transforms)
 
 
-hp = model.hparams
-transform = get_transform(hp.img_size, rotation=0)
-model.hparams.charset_test = "अआइईउऊऋऌऍऎएऐऑऒओऔकखगघङचछजझञटठडढणतथदधनऩपफबभमयरऱलळऴवशषसह़ऽािीुूृॄॅॆेैॉॊोौ्ॐ॒॑॓॔ॕॖॠॡॢॣ।॥०१२३४५६७८९॰ॱॲॻॿ"
-predictions = []
-for image in os.listdir("testing-data/new_crops"):
-    image_path = os.path.join("testing-data/new_crops", image)
-    img = Image.open(image_path).convert('RGB')
-    img = transform(img)
-    logits = model(img.unsqueeze(0).to(device))
-    probs = logits.softmax(-1)
-    preds, probs = model.tokenizer.decode(probs)
-    text = model.charset_adapter(preds[0])
-    predictions.append({"image": image, "prediction": text})
-print(predictions)
+def load_and_update_model(chkpt, lang):
+    if os.path.exists(chkpt) is False:
+        print(f'Specified checkpoint does not exist')
+        return None
+    model = load_from_checkpoint(chkpt).eval().to(device)
+    hp = model.hparams
+    transform = get_transform(hp.img_size, rotation=0)
+    hp.charset_test = get_charset(lang)
+    return model, transform
+
+
+def predict_results(model, transform, images):
+    predictions = []
+    for image in os.listdir(images):
+        imp = os.path.join(images, image)
+        img = Image.open(imp).convert('RGB')
+        img = transform(img)
+        logits = model(img.unsqueeze(0).to(device))
+        probs = logits.softmax(-1)
+        preds, probs = model.tokenizer.decode(probs)
+        text = model.charset_adapter(preds[0])
+        predictions.append({"image": image, "prediction": text})
+    #print(predictions)
+    return predictions
+
+
+def process_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--checkpoint', help="Pretrained model path", required=True)
+    parser.add_argument('--images', help='Images to read', required=True)
+    parser.add_argument('--output', help='Output directory to save the predictions', required=False)
+    parser.add_argument('--language',
+                        help='The language script in use, supported: Devanagari',
+                        default="Devanagari")
+    args = parser.parse_args()
+    return args
+
+
+def start_main():
+    args = process_args()
+    model, xform = load_and_update_model(args.checkpoint, args.language)
+    results = predict_results(model, xform, args.images)
+    save_output(args.output, results)
+
+
+if __name__ == '__main__':
+    start_main()
+
