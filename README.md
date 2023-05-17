@@ -95,6 +95,7 @@ print('Decoded label = {}'.format(label[0]))
 - How do I test on my own dataset? See Issue [#27](https://github.com/baudm/parseq/issues/27).
 - How do I finetune and/or create a custom dataset? See Issue [#7](https://github.com/baudm/parseq/issues/7).
 - What is `val_NED`? See Issue [#10](https://github.com/baudm/parseq/issues/10).
+- Where is Indian Langauge pretrained model?  Here [URL](https://drive.google.com/file/d/1zhDnTP-3go5vez7l9SO6BmtfoJDgIUUo/view?usp=sharing).
 
 ## Training
 The training script can train any supported model. You can override any configuration using the command line. Please refer to [Hydra](https://hydra.cc) docs for more info about the syntax. Use `./train.py --help` to see the default configuration.
@@ -235,6 +236,39 @@ We use [Ray Tune](https://www.ray.io/ray-tune) for automated parameter tuning of
 ./tune.py +experiment=tune_abinet-lm  # find the optimum learning rate for ABINet's language model
 ```
 
+# Containerization
+To run this code under containers build the container. Run the container with shared volume that
+has input images
+## Building container
+```bash
+	docker build -f containers/Dockerfile -t parser:dbnet .
+```
+## Running in the container
+```bash
+	docker run -it --gpus all "/home/layout/layout-parser/images":/images parser:parseq python3 translate.py -c pretrained/parseq-e31s111128ac8894vned9738.ckpt -i /images -l Devanagari
+```
+## Sample output
+```bash
+	==========
+	== CUDA ==
+	==========
+
+	CUDA Version 11.7.1
+
+	Container image Copyright (c) 2016-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+	This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+	By pulling and using the container, you accept the terms and conditions of this license:
+	https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+	A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+	[{'image': 'kumudini.jpeg', 'prediction': 'कुमुदिनी'},
+	 {'image': 'apeksha.jpeg', 'prediction': 'अपेक्ष्मा'}, 
+	 {'image': 'namdev.jpeg', 'prediction': 'नाम्रदेव'},
+	 {'image': 'swapnpoorti.jpeg', 'prediction': 'स्वप्नपुर्ती'},
+	 {'image': 'prabhaat.jpeg', 'prediction': 'प्रभात'}]
+```
 ## Citation
 ```bibtex
 @InProceedings{bautista2022parseq,
