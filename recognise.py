@@ -7,6 +7,7 @@ import string
 import os
 from typing import Tuple
 import torch
+import numpy as np
 from strhub.data.module import SceneTextDataModule
 from strhub.models.utils import load_from_checkpoint
 from torchvision import transforms as T
@@ -31,14 +32,29 @@ def get_charset(lang):
         return charsets[-1]
 
 
-def save_output(fname, results):
+def save_output_extended(fname, results):
+    with open(fname, 'a') as of:
+        for result in results:
+            imname = result['image']
+            of.writelines(f"{imname}\n")
+            for pred in result['prediction']:
+                bbstr = np.array2string(pred[1], separator=',')
+                bbstr = bbstr.strip(']').strip('[')
+                of.writelines(f"{bbstr},{pred[2]}\n")
+
+
+def save_output(fname, results, new_format=False):
     if fname is None:
         for idx, item in enumerate(results):
             print(f"{item['image']}:{item['prediction']}")
         return
-    with open(fname, 'a') as of:
-        for idx, item in enumerate(results):
-            of.writelines(f"{item['image']}:{item['prediction']}\n")
+    if new_format is False:
+        with open(fname, 'a') as of:
+            for idx, item in enumerate(results):
+                of.writelines(f"{item['image']}:{item['prediction']}\n")
+    else:
+        save_output_extended(fname, results)
+    return
 
 
 def get_transform(img_size:Tuple[int], augment:bool = False, rotation:int = 0):
