@@ -81,12 +81,11 @@ def process_args():
     parser.add_argument('--language', '-l',
                         help='The language script in use, supported: Devanagari',
                         default="Devanagari")
-    args = parser.parse_args()
-    return args
+    return parser
 
 
 def start_main():
-    args = process_args()
+    args = process_args().parse_args()
     model, xform = load_and_update_model(args.checkpoint, args.language)
     results = predict_results(model, xform, args.images)
     save_output(args.output, results)

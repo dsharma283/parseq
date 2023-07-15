@@ -241,11 +241,11 @@ To run this code under containers build the container. Run the container with sh
 has input images
 ## Building container
 ```bash
-	docker build -f containers/Dockerfile -t parser:dbnet .
+	docker build -f containers/Dockerfile -t parser:parseq .
 ```
 ## Running in the container
 ```bash
-	docker run -it --gpus all "/home/layout/layout-parser/images":/images parser:parseq python3 recognise.py -c pretrained/parseq-e31s111128ac8894vned9738.ckpt -i /images -l Devanagari
+	docker run -it --gpus device=0 -v "/home/layout/layout-parser/images":/images parser:parseq python3 recognise.py -c pretrained/parseq-e31s111128ac8894vned9738.ckpt -i /images -l Devanagari
 ```
 ## Sample output
 ```bash
