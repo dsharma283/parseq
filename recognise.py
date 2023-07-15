@@ -1,3 +1,7 @@
+'''
+    Author: Devesh Sharma
+    email: sharma.98@iitj.ac.in
+'''
 import argparse
 import string
 import os
@@ -27,9 +31,14 @@ def get_charset(lang):
         return charsets[-1]
 
 
-def save_output(op_path, results):
-    if op_path is None:
-        print(results)
+def save_output(fname, results):
+    if fname is None:
+        for idx, item in enumerate(results):
+            print(f"{item['image']}:{item['prediction']}")
+        return
+    with open(fname, 'a') as of:
+        for idx, item in enumerate(results):
+            of.writelines(f"{item['image']}:{item['prediction']}\n")
 
 
 def get_transform(img_size:Tuple[int], augment:bool = False, rotation:int = 0):
@@ -62,7 +71,10 @@ def predict_results(model, transform, images):
     predictions = []
     for image in os.listdir(images):
         imp = os.path.join(images, image)
-        img = Image.open(imp).convert('RGB')
+        try:
+            img = Image.open(imp).convert('RGB')
+        except:
+            continue
         img = transform(img)
         logits = model(img.unsqueeze(0).to(device))
         probs = logits.softmax(-1)
@@ -84,11 +96,25 @@ def process_args():
     return parser
 
 
+def handle_paths(args):
+    o_path = args.output
+    if o_path is None:
+        return None
+
+    if os.path.exists(o_path) is False:
+        os.makedirs(o_path)
+    fname = os.path.join(o_path, "prediction.txt")
+    if os.path.isfile(fname) is True:
+        os.remove(fname)
+    return fname
+
+
 def start_main():
     args = process_args().parse_args()
+    fname = handle_paths(args)
     model, xform = load_and_update_model(args.checkpoint, args.language)
     results = predict_results(model, xform, args.images)
-    save_output(args.output, results)
+    save_output(fname, results)
 
 
 if __name__ == '__main__':
