@@ -33,23 +33,24 @@ def get_charset(lang):
 
 
 def save_output_extended(fname, results):
-    with open(fname, 'a') as of:
-        for result in results:
-            imname = result['image']
-            of.writelines(f"{imname}\n")
+    prefix = fname[1]
+    for result in results:
+        imname = result['image'].split('.')[0] + '.txt'
+        oppath = os.path.join(prefix, imname)
+        with open(oppath, 'w') as of:
             for pred in result['prediction']:
-                bbstr = np.array2string(pred[1], separator=',')
-                bbstr = bbstr.strip(']').strip('[')
+                bbstr = np.array2string(pred[1], separator=',', precision=int)
+                bbstr = bbstr.strip(']').strip('[').strip(' ')
                 of.writelines(f"{bbstr},{pred[2]}\n")
 
 
 def save_output(fname, results, new_format=False):
-    if fname is None:
+    if fname[0] is None:
         for idx, item in enumerate(results):
             print(f"{item['image']}:{item['prediction']}")
         return
     if new_format is False:
-        with open(fname, 'a') as of:
+        with open(fname[0], 'a') as of:
             for idx, item in enumerate(results):
                 of.writelines(f"{item['image']}:{item['prediction']}\n")
     else:
@@ -83,9 +84,18 @@ def load_and_update_model(chkpt, lang):
     return model, transform
 
 
+def should_skip(imname):
+    is_txt = imname.split('.')[-1] == 'txt'
+    is_res = imname.split('.')[0].split('_')[-1] == 'res'
+    return is_txt or is_res
+
+
 def predict_results(model, transform, images):
     predictions = []
     for image in os.listdir(images):
+        if should_skip(image):
+            continue
+
         imp = os.path.join(images, image)
         try:
             img = Image.open(imp).convert('RGB')
@@ -122,7 +132,7 @@ def handle_paths(args):
     fname = os.path.join(o_path, "prediction.txt")
     if os.path.isfile(fname) is True:
         os.remove(fname)
-    return fname
+    return (fname, o_path)
 
 
 def start_main():

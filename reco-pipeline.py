@@ -67,7 +67,10 @@ def recognise_one(model, im_descr, transform):
     bblist = im_descr[2]
     for idx, bb in enumerate(bblist):
         #crop = im.crop((bb[0][0], bb[0][1], bb[2][0], bb[2][1]))
-        crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
+        try:
+            crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
+        except:
+            continue
         crop = transform(crop)
         logits = model(crop.unsqueeze(0).to(device))
         probs = logits.softmax(-1)
