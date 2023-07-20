@@ -1,3 +1,7 @@
+'''
+    Author: Devesh Sharma
+    Email: sharma.98@iitj.ac.in
+'''
 import argparse
 import pygame
 import sys, os
