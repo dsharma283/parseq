@@ -18,6 +18,9 @@ device = "cpu"
 if torch.cuda.is_available() is True:
     device = "cuda"
 
+#cc = ''
+#for c in range(0x900, 0x980):
+#    cc +=chr(hex(c))
 
 charsets = [
     "अआइईउऊऋऌऍऎएऐऑऒओऔकखगघङचछजझञटठडढणतथदधनऩपफबभमयरऱलळऴवशषसह़ऽािीुूृॄॅॆेैॉॊोौ्ॐ॒॑॓॔ॕॖॠॡॢॣ।॥०१२३४५६७८९॰ॱॲॻॿ",
