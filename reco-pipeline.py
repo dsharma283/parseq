@@ -80,8 +80,12 @@ def recognise_one(model, im_descr, transform):
     return {"image": imname, "prediction": prediction}
 
 
-def recognise_multiple(model, transform, images):
+def recognise_multiple(args):
     predictions = []
+
+    model, transform = load_and_update_model(args.checkpoint, args.language)
+    images = args.images
+
     for image in os.listdir(images):
         # Skip DBNet images with BB marked
         if is_detection_result_file(image):
@@ -108,8 +112,7 @@ def recognise_multiple(model, transform, images):
 def start_main():
     args = process_args_extended().parse_args()
     fname = handle_paths(args)
-    model, xform = load_and_update_model(args.checkpoint, args.language)
-    results = recognise_multiple(model, xform, args.images)
+    results = recognise_multiple(args)
     save_output(fname, results, new_format=True)
 
 
