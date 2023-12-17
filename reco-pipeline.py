@@ -15,7 +15,7 @@ import numpy as np
 from recognise import (charsets, get_charset, handle_paths,
                        load_and_update_model, process_args,
                        save_output)
-
+from predict_crops import identify_script
 
 device = "cpu"
 if torch.cuda.is_available() is True:
@@ -25,6 +25,10 @@ if torch.cuda.is_available() is True:
 def process_args_extended():
     parser = process_args()
     parser.add_argument('--data', '-d', help="Data path", required=False)
+    parser.add_argument('--with-scriptid', '-s', required=False, action='store_true',
+                        help="run the prediction with script identification", default=False)
+    parser.add_argument('--scriptid-mod-path', '-m', required=False, type=str,
+                        help="Script identification pretrained model path", default='./checkpoints')
     return parser
 
 
@@ -60,6 +64,14 @@ def read_bbfile(bbfile):
     return bblist
 
 
+def predict_text(model, xform, crop):
+    logits = model(xform(crop).unsqueeze(0).to(device))
+    probs = logits.softmax(-1)
+    preds, probs = model.tokenizer.decode(probs)
+    text = model.charset_adapter(preds[0])
+    return text
+
+
 def recognise_one(model, im_descr, transform):
     prediction = []
     im = im_descr[0]
@@ -71,19 +83,41 @@ def recognise_one(model, im_descr, transform):
             crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
         except:
             continue
-        crop = transform(crop)
-        logits = model(crop.unsqueeze(0).to(device))
-        probs = logits.softmax(-1)
-        preds, probs = model.tokenizer.decode(probs)
-        text = model.charset_adapter(preds[0])
+        text = predict_text(model, transform, crop)
         prediction.append([idx, bb, text])
     return {"image": imname, "prediction": prediction}
 
 
-def recognise_multiple(args):
-    predictions = []
+def recognise_one_with_scriptid(args, im_descr):
+    im, imname, bblist = im_descr[0], im_descr[1], im_descr[2]
+    modpath = args.scriptid_mod_path
+    crops, prediction = [], []
 
-    model, transform = load_and_update_model(args.checkpoint, args.language)
+    for idx, bb in enumerate(bblist):
+        crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
+        crops.append(crop)
+    scriptids = identify_script(modpath, crops)
+
+    for key in scriptids.keys():
+        if key != 'unknown':
+            model, transform = load_and_update_model(args.checkpoint, key)
+
+        for bbid in scriptids[key]:
+            bb = bblist[bbid]
+            text = ''
+            if key != 'unknown':
+                crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
+                text = predict_text(model, transform, crop)
+            prediction.append([bbid, bb, text, key])
+    return {"image": imname, "prediction": prediction}
+
+
+def recognise_multiple(args, fname):
+    predictions = []
+    model, transform = None, None
+
+    if args.with_scriptid is False:
+        model, transform = load_and_update_model(args.checkpoint, args.language)
     images = args.images
 
     for image in os.listdir(images):
@@ -104,7 +138,12 @@ def recognise_multiple(args):
             continue
         bblist = read_bbfile(bbfile)
         im_descr = (img, image, bblist)
-        preds = recognise_one(model, im_descr, transform)
+        if args.with_scriptid is False:
+            preds = recognise_one(model, im_descr, transform)
+        else:
+            preds = recognise_one_with_scriptid(args, im_descr)
+        #print(preds)
+        save_output(fname, [preds], new_format=True)
         predictions.append(preds)
     return predictions
 
@@ -112,8 +151,8 @@ def recognise_multiple(args):
 def start_main():
     args = process_args_extended().parse_args()
     fname = handle_paths(args)
-    results = recognise_multiple(args)
-    save_output(fname, results, new_format=True)
+    results = recognise_multiple(args, fname)
+    #save_output(fname, results, new_format=True)
 
 
 if __name__ == '__main__':

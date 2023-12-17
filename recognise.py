@@ -42,9 +42,12 @@ def save_output_extended(fname, results):
         oppath = os.path.join(prefix, imname)
         with open(oppath, 'w') as of:
             for pred in result['prediction']:
-                bbstr = np.array2string(pred[1], separator=',', precision=int)
-                bbstr = bbstr.strip(']').strip('[').strip(' ')
-                of.writelines(f"{bbstr},{pred[2]}\n")
+                bbstr = ','.join(map(str, pred[1]))
+                if len(pred) == 4:
+                    s = f"{bbstr},{pred[2]},{pred[3]},{pred[0]}\n"
+                else:
+                    s = f"{bbstr}, {pred[2]}\n"
+                of.writelines(s)
 
 
 def save_output(fname, results, new_format=False):
@@ -77,13 +80,23 @@ def get_transform(img_size:Tuple[int], augment:bool = False, rotation:int = 0):
 
 
 def load_and_update_model(chkpt, lang):
-    if os.path.exists(chkpt) is False:
+    if os.path.isdir(chkpt):
+        base = os.path.join(chkpt, lang)
+        flist = [fl for fl in os.listdir(base) if fl.endswith('.ckpt')]
+        mod_path = os.path.join(base, flist[0])
+    else:
+        mod_path = chkpt
+
+    if os.path.exists(mod_path) is False:
         print(f'Specified checkpoint does not exist')
         return None
-    model = load_from_checkpoint(chkpt).eval().to(device)
+    if lang == 'english':
+        model = torch.hub.load('baudm/parseq', 'parseq',# source='local',
+                               pretrained=True).eval().to(device)
+    else:
+        model = load_from_checkpoint(mod_path).eval().to(device)
     hp = model.hparams
     transform = get_transform(hp.img_size, rotation=0)
-    hp.charset_test = get_charset(lang)
     return model, transform
 
 
