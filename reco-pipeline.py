@@ -24,11 +24,13 @@ if torch.cuda.is_available() is True:
 
 def process_args_extended():
     parser = process_args()
-    parser.add_argument('--data', '-d', help="Data path", required=False)
     parser.add_argument('--with-scriptid', '-s', required=False, action='store_true',
                         help="run the prediction with script identification", default=False)
     parser.add_argument('--scriptid-mod-path', '-m', required=False, type=str,
-                        help="Script identification pretrained model path", default='./checkpoints')
+                        help="Script identification pretrained model path",
+                        default='./checkpoints')
+    parser.add_argument('--save-crops', '-S', required=False, action='store_true',
+                        help="Enable saving the cropped bounding boxes", default=False)
     return parser
 
 
@@ -64,6 +66,14 @@ def read_bbfile(bbfile):
     return bblist
 
 
+def save_crop(output, imname, crop, bbid):
+    base = os.path.join(output, 'crops', imname)
+    if os.path.isdir(base) is False:
+        os.makedirs(base)
+    fname = os.path.join(base, f'{imname}_{bbid}.jpg')
+    crop.resize((224, 224)).save(fname)
+
+
 def predict_text(model, xform, crop):
     logits = model(xform(crop).unsqueeze(0).to(device))
     probs = logits.softmax(-1)
@@ -95,6 +105,9 @@ def recognise_one_with_scriptid(args, im_descr):
 
     for idx, bb in enumerate(bblist):
         crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
+        if args.save_crops is True:
+            imgn = imname.split('.')[0]
+            save_crop(args.output, imgn, crop, idx)
         crops.append(crop)
     scriptids = identify_script(modpath, crops)
 
@@ -152,7 +165,6 @@ def start_main():
     args = process_args_extended().parse_args()
     fname = handle_paths(args)
     results = recognise_multiple(args, fname)
-    #save_output(fname, results, new_format=True)
 
 
 if __name__ == '__main__':

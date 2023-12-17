@@ -55,7 +55,7 @@ def resume_model(mod_path):
     return entry
 
 
-def load_model(mod_path):
+def load_model(mod_path, verbose):
     entry = resume_model(mod_path)
 
     nclass = entry['classmap']['nclass']
@@ -67,7 +67,8 @@ def load_model(mod_path):
     model.load_state_dict(entry['model_state_dict'])
 
     epoch = entry['epoch']
-    print(f'Resumed {mod_path} from epoch {epoch} with addressable classes {classes}')
+    if verbose:
+        print(f'Resumed {mod_path} from epoch {epoch} with addressable classes {classes}')
     xform = build_transform(224, stats)
 
     return model, entry['classmap'], xform
@@ -103,8 +104,8 @@ def predict_crops(crops, model, classmap, xform):
     return preds
 
 
-def identify_script(mod_path, crops):
-    model, classmap, xform = load_model(mod_path)
+def identify_script(mod_path, crops, verbose=False):
+    model, classmap, xform = load_model(mod_path, verbose)
     return predict_crops(crops, model, classmap, xform)
 
 '''
