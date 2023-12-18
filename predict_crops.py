@@ -93,9 +93,12 @@ def predict_crops(crops, model, classmap, xform):
         return preds
     with torch.no_grad():
         for idx, crop in enumerate(crops):
-            crop = xform(crop).unsqueeze(0).to(device)
-            pred = predict_one(crop, model, classmap['classes'])
-            #print(idx, pred)
+            if crop is None:
+                pred = 'unknown'
+            else:
+                crop = xform(crop).unsqueeze(0).to(device)
+                pred = predict_one(crop, model, classmap['classes'])
+                #print(idx, pred)
             if pred not in preds:
                 preds[pred] = [idx]
             else:

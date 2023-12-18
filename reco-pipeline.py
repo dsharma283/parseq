@@ -104,8 +104,13 @@ def recognise_one_with_scriptid(args, im_descr):
     crops, prediction = [], []
 
     for idx, bb in enumerate(bblist):
-        crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
-        if args.save_crops is True:
+        #print(f'bb0={bb[0]}, bb1={bb[1]}, bb4 = {bb[4]}, bb5 ={bb[5]}')
+        try:
+            crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
+        except:
+            crop = None
+            print(f'invalid cropping points {imname}-{idx}')
+        if args.save_crops is True and crop is not None:
             imgn = imname.split('.')[0]
             save_crop(args.output, imgn, crop, idx)
         crops.append(crop)
