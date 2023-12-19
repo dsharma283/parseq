@@ -31,6 +31,8 @@ def process_args_extended():
                         default='./checkpoints')
     parser.add_argument('--save-crops', '-S', required=False, action='store_true',
                         help="Enable saving the cropped bounding boxes", default=False)
+    parser.add_argument('--skip-unknown', '-U', required=False, action='store_true',
+                        help="Skip saving the recognition taged as Unknown", default=False)
     return parser
 
 
@@ -133,6 +135,9 @@ def recognise_one_with_scriptid(args, im_descr):
     scriptids = identify_script(modpath, crops)
 
     for key in scriptids.keys():
+        if key == 'unknown' and args.skip_unknown is True:
+            continue
+
         if key != 'unknown':
             model, transform = load_and_update_model(args.checkpoint, key)
 
