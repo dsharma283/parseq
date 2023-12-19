@@ -4,7 +4,7 @@
 '''
 import argparse
 import string
-import os
+import os, cv2
 from typing import Tuple
 import torch
 from strhub.data.module import SceneTextDataModule
@@ -66,6 +66,20 @@ def read_bbfile(bbfile):
     return bblist
 
 
+def generate_crop(im, bb, is_poly=False):
+    bb = np.reshape(bb, (-1, 2))
+    rect = cv2.boundingRect(bb)
+    x, y, w, h = rect
+    croped = np.array(im)[y:y+h, x:x+w]
+
+    bb = bb - bb.min(axis=0)
+    mask = np.zeros(croped.shape[:2], np.uint8)
+    cv2.drawContours(mask, [bb], -1, (255, 255, 255), -1, cv2.LINE_AA)
+    dst = cv2.bitwise_and(croped, croped, mask=mask)
+
+    return Image.fromarray(dst)
+
+
 def save_crop(output, imname, crop, bbid):
     base = os.path.join(output, 'crops', imname)
     if os.path.isdir(base) is False:
@@ -89,10 +103,11 @@ def recognise_one(model, im_descr, transform):
     bblist = im_descr[2]
     for idx, bb in enumerate(bblist):
         #crop = im.crop((bb[0][0], bb[0][1], bb[2][0], bb[2][1]))
-        try:
-            crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
-        except:
-            continue
+        #try:
+        #crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
+        crop = generate_crop(im, bb)
+        #except:
+        #continue
         text = predict_text(model, transform, crop)
         prediction.append([idx, bb, text])
     return {"image": imname, "prediction": prediction}
@@ -105,11 +120,12 @@ def recognise_one_with_scriptid(args, im_descr):
 
     for idx, bb in enumerate(bblist):
         #print(f'bb0={bb[0]}, bb1={bb[1]}, bb4 = {bb[4]}, bb5 ={bb[5]}')
-        try:
-            crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
-        except:
-            crop = None
-            print(f'invalid cropping points {imname}-{idx}')
+        #try:
+        #crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
+        crop = generate_crop(im, bb)
+        #except:
+        #crop = None
+        #print(f'invalid cropping points {imname}-{idx}')
         if args.save_crops is True and crop is not None:
             imgn = imname.split('.')[0]
             save_crop(args.output, imgn, crop, idx)
@@ -124,7 +140,8 @@ def recognise_one_with_scriptid(args, im_descr):
             bb = bblist[bbid]
             text = ''
             if key != 'unknown':
-                crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
+                #crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
+                crop = generate_crop(im, bb)
                 text = predict_text(model, transform, crop)
             prediction.append([bbid, bb, text, key])
     return {"image": imname, "prediction": prediction}
