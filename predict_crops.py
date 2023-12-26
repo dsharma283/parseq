@@ -98,12 +98,10 @@ def predict_crops(crops, model, classmap, xform):
             else:
                 crop = xform(crop).unsqueeze(0).to(device)
                 pred = predict_one(crop, model, classmap['classes'])
-                #print(idx, pred)
             if pred not in preds:
                 preds[pred] = [idx]
             else:
                 preds[pred].append(idx)
-            #preds.append((idx, pred))
     return preds
 
 

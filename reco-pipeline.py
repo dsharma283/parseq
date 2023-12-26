@@ -104,12 +104,10 @@ def recognise_one(model, im_descr, transform):
     imname = im_descr[1]
     bblist = im_descr[2]
     for idx, bb in enumerate(bblist):
-        #crop = im.crop((bb[0][0], bb[0][1], bb[2][0], bb[2][1]))
-        #try:
-        #crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
-        crop = generate_crop(im, bb)
-        #except:
-        #continue
+        try:
+            crop = generate_crop(im, bb)
+        except:
+            continue
         text = predict_text(model, transform, crop)
         prediction.append([idx, bb, text])
     return {"image": imname, "prediction": prediction}
@@ -121,13 +119,11 @@ def recognise_one_with_scriptid(args, im_descr):
     crops, prediction = [], []
 
     for idx, bb in enumerate(bblist):
-        #print(f'bb0={bb[0]}, bb1={bb[1]}, bb4 = {bb[4]}, bb5 ={bb[5]}')
-        #try:
-        #crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
-        crop = generate_crop(im, bb)
-        #except:
-        #crop = None
-        #print(f'invalid cropping points {imname}-{idx}')
+        try:
+            crop = generate_crop(im, bb)
+        except:
+            crop = None
+            print(f'invalid cropping points {imname}-{idx}')
         if args.save_crops is True and crop is not None:
             imgn = imname.split('.')[0]
             save_crop(args.output, imgn, crop, idx)
@@ -145,7 +141,6 @@ def recognise_one_with_scriptid(args, im_descr):
             bb = bblist[bbid]
             text = ''
             if key != 'unknown':
-                #crop = im.crop((bb[0], bb[1], bb[4], bb[5]))
                 crop = generate_crop(im, bb)
                 text = predict_text(model, transform, crop)
             prediction.append([bbid, bb, text, key])

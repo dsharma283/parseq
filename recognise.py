@@ -91,7 +91,7 @@ def load_and_update_model(chkpt, lang):
         print(f'Specified checkpoint does not exist')
         return None
     if lang == 'english':
-        model = torch.hub.load('baudm/parseq', 'parseq',# source='local',
+        model = torch.hub.load('baudm/parseq', 'parseq',
                                pretrained=True).eval().to(device)
     else:
         model = load_from_checkpoint(mod_path).eval().to(device)
