@@ -36,7 +36,7 @@ def build_transform(imsize, norm):
 
 
 def build_resnet(nclass):
-    model = models.resnet18(weights='ResNet18_Weights.DEFAULT')
+    model = models.resnet18(weights=None)
     for param in model.parameters():
         param.require_grad = False
     #print(model)
