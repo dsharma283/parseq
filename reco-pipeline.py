@@ -144,7 +144,7 @@ def recognise_one_with_scriptid(args, im_descr):
                 crop = generate_crop(im, bb)
                 text = predict_text(model, transform, crop)
             prediction.append([bbid, bb, text, key])
-    return {"image": imname, "prediction": prediction}
+    return {"image": imname, "prediction": sorted(prediction, key=lambda x : int(x[0]))}
 
 
 def recognise_multiple(args, fname):
