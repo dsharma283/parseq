@@ -1,4 +1,4 @@
-import argparse
+import argparse, json
 import os, sys
 import tqdm
 
@@ -11,7 +11,15 @@ def process_args():
                         help='Path to predicted text from model')
     parser.add_argument('--output', '-o', required=False, default='./output',
                         help='The evaluation output will be written to this path')
+    parser.add_argument('--jsonpath', '-j', required=False, default=None,
+                        help='Json file path for annotations')
     return parser
+
+
+def process_json(path):
+    with open(path, 'r') as inf:
+        data = json.load(inf)
+    return data
 
 
 def process_files(path, pos, prefix=''):
@@ -39,12 +47,16 @@ def process_files(path, pos, prefix=''):
 
 
 def process_gts(args):
-    gts = None
+    fgts, jgts = None, None
     if not os.path.exists(args.ground_truth):
         return None
     gtpath = args.ground_truth
-    gts = process_files(gtpath, pos=-1, prefix='res_')
-    return gts
+    if args.jsonpath is None:
+        fgts = process_files(gtpath, pos=-3, prefix='res_')
+    else:
+        jgts = process_json(args.jsonpath)
+        fgts = process_files(gtpath, pos=-3, prefix='res_')
+    return fgts, jgts
 
 
 def process_preds(args):
@@ -56,23 +68,70 @@ def process_preds(args):
     return preds
 
 
+def search_gts(jgts, fgts, jgtkey, fgtkey, bbid):
+    gtword = None
+    if jgts != None:
+        gt = [item for item in jgts['files'] if item['filename'] == jgtkey]
+        if len(gt) == 0:
+            gtword = None
+        else:
+            gtword = gt[0]['text'].strip(' ').strip('/').strip('.').strip('-').lower()
+    if fgts != None and gtword is None:
+        gtword = fgts[fgtkey].get(bbid)
+        if not gtword is None:
+            gtword = gtword.strip(' ').strip('/').strip('.').strip('-').lower()
+
+    return gtword
+
+
 def evaluate(gts, preds):
-    print(gts['image_1271'])
-    print(preds['image_1271'])
+    gt_count, correct, fail, detected = 0, 0, 0, 0
+    fgts, jgts = gts[0], gts[1]
+
+    pbar = tqdm.tqdm(preds.keys())
+    for idx, key in enumerate(pbar):
+        pbar.set_postfix_str(key)
+        for bbid in preds[key].keys():
+            jgtkey = f'{key}_{bbid}.jpg'
+            fgtkey = key 
+            pred = preds[key][bbid]
+            #if not pred == '':
+            detected += 1
+            gtword = search_gts(jgts, fgts, jgtkey, fgtkey, bbid)
+            if gtword == None:
+                continue
+            gt_count += 1
+            if pred == gtword:
+                correct += 1
+            else:
+                fail += 1
+    recall = correct / gt_count
+    precision = correct / detected
+    fscore = 2 * precision * recall / (precision + recall)
+
+    print(f'predicted word count:\t\t{detected}')
+    print(f'GT word count:\t\t\t{gt_count}')
+    print(f'Correct prediction count:\t{correct}')
+    print(f'Failed prediction count:\t{fail}')
+    print(f'Precision:\t\t\t{precision}')
+    print(f'Recall:\t\t\t\t{recall}')
+    print(f'Fscore:\t\t\t\t{fscore}')
     return None
 
 
+'''
 def save_output(args, res):
     pass
+'''
 
 
 def start_main():
     args = process_args().parse_args()
     gts = process_gts(args)
     preds = process_preds(args)
-    res = evaluate(gts, preds)
-    save_output(args, res)
+    _ = evaluate(gts, preds)
 
 
 if __name__ == '__main__':
     start_main()
+

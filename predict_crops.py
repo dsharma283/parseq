@@ -57,10 +57,10 @@ def resume_model(mod_path):
 
 def load_model(mod_path, verbose):
     entry = resume_model(mod_path)
-
     nclass = entry['classmap']['nclass']
     classes = entry['classmap']['classes']
     stats = entry['classmap']['stats']
+    #stats = [(0.446, 0.449, 0.439), (0.262, 0.258, 0.276)]
 
     model = build_resnet(nclass)
     model = model.to(device)
