@@ -35,7 +35,7 @@ def get_charset(lang):
         return charsets[-1]
 
 
-def save_output_extended(fname, results):
+def save_output_extended(fname, results, withconf=False):
     prefix = fname[1]
     for result in results:
         imname = result['image'].split('.')[0] + '.txt'
@@ -43,14 +43,22 @@ def save_output_extended(fname, results):
         with open(oppath, 'w') as of:
             for pred in result['prediction']:
                 bbstr = ','.join(map(str, pred[1]))
-                if len(pred) == 4:
+                if len(pred) >= 4:
                     s = f"{bbstr},{pred[2]},{pred[3]},{pred[0]}\n"
                 else:
                     s = f"{bbstr}, {pred[2]}\n"
                 of.writelines(s)
+        if withconf:
+            cnfname = result['image'].split('.')[0] + '.cnf'
+            cnfpath = os.path.join(prefix, 'confs', cnfname)
+            with open(cnfpath, 'w') as of:
+                for pred in result['prediction']:
+                    cnf = ','.join(map(str, pred[4]))
+                    s = f'{cnf},{pred[2]},{pred[3]},{pred[0]}\n'
+                    of.writelines(s)
 
 
-def save_output(fname, results, new_format=False):
+def save_output(fname, results, new_format=False, withconf=False):
     if fname[0] is None:
         for idx, item in enumerate(results):
             print(f"{item['image']}:{item['prediction']}")
@@ -60,7 +68,7 @@ def save_output(fname, results, new_format=False):
             for idx, item in enumerate(results):
                 of.writelines(f"{item['image']}:{item['prediction']}\n")
     else:
-        save_output_extended(fname, results)
+        save_output_extended(fname, results, withconf)
     return
 
 
@@ -140,7 +148,7 @@ def process_args():
     return parser
 
 
-def handle_paths(args):
+def handle_paths(args, withconf=False):
     o_path = args.output
     if o_path is None:
         return None
@@ -150,6 +158,10 @@ def handle_paths(args):
     fname = os.path.join(o_path, "prediction.txt")
     if os.path.isfile(fname) is True:
         os.remove(fname)
+    if withconf:
+        cnfpath = os.path.join(o_path, 'confs')
+        if not os.path.exists(cnfpath):
+            os.makedirs(cnfpath)
     return (fname, o_path)
 
 

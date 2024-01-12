@@ -33,6 +33,11 @@ def process_args_extended():
                         help="Enable saving the cropped bounding boxes", default=False)
     parser.add_argument('--skip-unknown', '-U', required=False, action='store_true',
                         help="Skip saving the recognition taged as Unknown", default=False)
+    parser.add_argument('--force-unknown', '-F', required=False, action='store_true', default=False,
+                        help='''Force the processing of Unknows through multiple '''
+                             '''recognizers and select the heigest confident prediction''')
+    parser.add_argument('--with-conf', '-C', required=False, action='store_true', default=False,
+                        help="Generated the prediction output with confidence in .conf file")
     return parser
 
 
@@ -98,6 +103,13 @@ def predict_text(model, xform, crop):
     return text
 
 
+def handle_unknown_forced(crop, cnf, classmap, ckpt_path):
+    topk = np.argpartition(cnf, -2)[-2:]
+    tlang = classmap[topk[0]]
+    model, xform = load_and_update_model(ckpt_path, tlang)
+    return predict_text(model, xform, crop)
+
+
 def recognise_one(model, im_descr, transform):
     prediction = []
     im = im_descr[0]
@@ -128,7 +140,7 @@ def recognise_one_with_scriptid(args, im_descr):
             imgn = imname.split('.')[0]
             save_crop(args.output, imgn, crop, idx)
         crops.append(crop)
-    scriptids = identify_script(modpath, crops)
+    scriptids, classmap = identify_script(modpath, crops)
 
     for key in scriptids.keys():
         if key == 'unknown' and args.skip_unknown is True:
@@ -137,13 +149,20 @@ def recognise_one_with_scriptid(args, im_descr):
         if key != 'unknown':
             model, transform = load_and_update_model(args.checkpoint, key)
 
-        for bbid in scriptids[key]:
+        for idx, entry in enumerate(scriptids[key]):
+            bbid = next(iter(entry))
             bb = bblist[bbid]
+            conf = entry[bbid]
             text = ''
-            if key != 'unknown':
+            try:
                 crop = generate_crop(im, bb)
+            except:
+                crop = None
+            if key != 'unknown':
                 text = predict_text(model, transform, crop)
-            prediction.append([bbid, bb, text, key])
+            elif args.force_unknown and crop:
+                text = handle_unknown_forced(crop, conf, classmap, args.checkpoint)
+            prediction.append([bbid, bb, text, key, conf])
     return {"image": imname, "prediction": sorted(prediction, key=lambda x : int(x[0]))}
 
 
@@ -177,15 +196,15 @@ def recognise_multiple(args, fname):
             preds = recognise_one(model, im_descr, transform)
         else:
             preds = recognise_one_with_scriptid(args, im_descr)
-        #print(preds)
-        save_output(fname, [preds], new_format=True)
+        save_output(fname, [preds], new_format=True,
+                    withconf=args.with_conf)
         predictions.append(preds)
     return predictions
 
 
 def start_main():
     args = process_args_extended().parse_args()
-    fname = handle_paths(args)
+    fname = handle_paths(args, args.with_conf)
     results = recognise_multiple(args, fname)
 
 

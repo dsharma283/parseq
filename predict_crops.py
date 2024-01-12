@@ -78,11 +78,11 @@ def predict_one(img, model, classes, nograd=False):
     if nograd:
         with torch.no_grad():
             output = model(img)
-            pred = output.argmax(dim=1, keepdim=True).detach().to('cpu').numpy().item()
     else:
         output = model(img)
-        pred = output.argmax(dim=1, keepdim=True).detach().to('cpu').numpy().item()
-    return classes[pred]
+    conf = output.detach().to('cpu').numpy().squeeze()
+    pred = np.argmax(conf).item()
+    return classes[pred], conf
 
 
 def predict_crops(crops, model, classmap, xform):
@@ -95,19 +95,20 @@ def predict_crops(crops, model, classmap, xform):
         for idx, crop in enumerate(crops):
             if crop is None:
                 pred = 'unknown'
+                conf = np.zeros(len(classmap['classes']), dtype=np.float64)
             else:
                 crop = xform(crop).unsqueeze(0).to(device)
-                pred = predict_one(crop, model, classmap['classes'])
+                pred, conf = predict_one(crop, model, classmap['classes'])
             if pred not in preds:
-                preds[pred] = [idx]
+                preds[pred] = [{idx: conf}]
             else:
-                preds[pred].append(idx)
+                preds[pred].append({idx: conf})
     return preds
 
 
 def identify_script(mod_path, crops, verbose=False):
     model, classmap, xform = load_model(mod_path, verbose)
-    return predict_crops(crops, model, classmap, xform)
+    return predict_crops(crops, model, classmap, xform), classmap['classes']
 
 '''
 def start_main():
