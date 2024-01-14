@@ -13,9 +13,8 @@ from torchvision import transforms as T
 from PIL import Image
 import numpy as np
 from recognise import (charsets, get_charset, handle_paths,
-                       load_and_update_model, process_args,
-                       save_output)
-from predict_crops import identify_script
+                       load_and_update_model, process_args)
+from recopipeline import predict_text, generate_crop
 
 device = "cpu"
 if torch.cuda.is_available() is True:
@@ -24,21 +23,21 @@ if torch.cuda.is_available() is True:
 
 def process_args_extended():
     parser = process_args()
-    parser.add_argument('--with-scriptid', '-s', required=False, action='store_true',
-                        help="run the prediction with script identification", default=False)
-    parser.add_argument('--scriptid-mod-path', '-m', required=False, type=str,
-                        help="Script identification pretrained model path",
-                        default='./checkpoints')
     parser.add_argument('--save-crops', '-S', required=False, action='store_true',
                         help="Enable saving the cropped bounding boxes", default=False)
-    parser.add_argument('--skip-unknown', '-U', required=False, action='store_true',
-                        help="Skip saving the recognition taged as Unknown", default=False)
-    parser.add_argument('--force-unknown', '-F', required=False, action='store_true', default=False,
-                        help='''Force the processing of Unknows through multiple '''
-                             '''recognizers and select the heigest confident prediction''')
-    parser.add_argument('--with-conf', '-C', required=False, action='store_true', default=False,
-                        help="Generated the prediction output with confidence in .conf file")
     return parser
+
+
+def save_output(fname, results):
+    prefix = fname[1]
+    for result in results:
+        imname = result['image'].split('.')[0] + '.txt'
+        oppath = os.path.join(prefix, imname)
+        with open(oppath, 'w') as of:
+            for pred in result['prediction']:
+                cnf = ','.join(map(str, pred[3]))
+                s = f"{cnf},{pred[2]},{pred[0]}\n"
+                of.writelines(s)
 
 
 def is_detection_result_file(imname):
@@ -50,17 +49,6 @@ def is_detection_result_file(imname):
     return tokens[-1] == 'res' and is_txt is False
 
 
-def convert_to_pthw(bb, reshape_only=False):
-    coor = np.reshape(bb, (4, 2))
-    if reshape_only:
-        return coor
-
-    pt = coor[0]
-    w = coor[1][0] - coor[0][0]
-    h = coor[3][1] - coor[0][1]
-    return np.asarray([pt, w, h])
-
-
 def read_bbfile(bbfile):
     bblist = []
     with open(bbfile, 'r') as fp:
@@ -68,7 +56,6 @@ def read_bbfile(bbfile):
     for line in lines:
         line = line.strip('\n').split(',')[:-1]
         line = np.asarray([int(x) for x in line])
-        #line = convert_to_pthw(line, reshape_only=True)
         bblist.append(line)
     return bblist
 
@@ -103,13 +90,6 @@ def predict_text(model, xform, crop):
     return text, probs[0].detach().to('cpu').numpy()
 
 
-def handle_unknown_forced(crop, cnf, classmap, ckpt_path):
-    topk = np.argpartition(cnf, -2)[-2:]
-    tlang = classmap[topk[0]]
-    model, xform = load_and_update_model(ckpt_path, tlang)
-    return predict_text(model, xform, crop)
-
-
 def recognise_one(args, model, im_descr, transform):
     prediction = []
     im = im_descr[0]
@@ -125,49 +105,7 @@ def recognise_one(args, model, im_descr, transform):
             imgn = imname.split('.')[0]
             save_crop(args.output, imgn, crop, idx)
         text, probs = predict_text(model, transform, crop)
-        prediction.append([idx, bb, text])
-    return {"image": imname,
-            "prediction": sorted(prediction, key=lambda x : int(x[0]))}
-
-
-def recognise_one_with_scriptid(args, im_descr):
-    im, imname, bblist = im_descr[0], im_descr[1], im_descr[2]
-    modpath = args.scriptid_mod_path
-    crops, prediction = [], []
-
-    for idx, bb in enumerate(bblist):
-        try:
-            crop = generate_crop(im, bb)
-        except:
-            crop = None
-            print(f'invalid cropping points {imname}-{idx}')
-        if args.save_crops is True and crop is not None:
-            imgn = imname.split('.')[0]
-            save_crop(args.output, imgn, crop, idx)
-        crops.append(crop)
-    scriptids, classmap = identify_script(modpath, crops)
-
-    for key in scriptids.keys():
-        if key == 'unknown' and args.skip_unknown is True:
-            continue
-
-        if key != 'unknown':
-            model, transform = load_and_update_model(args.checkpoint, key)
-
-        for idx, entry in enumerate(scriptids[key]):
-            bbid = next(iter(entry))
-            bb = bblist[bbid]
-            conf = entry[bbid]
-            text = ''
-            try:
-                crop = generate_crop(im, bb)
-            except:
-                crop = None
-            if key != 'unknown':
-                text, probs = predict_text(model, transform, crop)
-            elif args.force_unknown and crop:
-                text, probs = handle_unknown_forced(crop, conf, classmap, args.checkpoint)
-            prediction.append([bbid, bb, text, key, conf])
+        prediction.append([idx, bb, text, probs])
     return {"image": imname,
             "prediction": sorted(prediction, key=lambda x : int(x[0]))}
 
@@ -176,8 +114,7 @@ def recognise_multiple(args, fname):
     predictions = []
     model, transform = None, None
 
-    if args.with_scriptid is False:
-        model, transform = load_and_update_model(args.checkpoint, args.language)
+    model, transform = load_and_update_model(args.checkpoint, args.language)
     images = args.images
 
     for image in os.listdir(images):
@@ -198,19 +135,15 @@ def recognise_multiple(args, fname):
             continue
         bblist = read_bbfile(bbfile)
         im_descr = (img, image, bblist)
-        if args.with_scriptid is False:
-            preds = recognise_one(args, model, im_descr, transform)
-        else:
-            preds = recognise_one_with_scriptid(args, im_descr)
-        save_output(fname, [preds], new_format=True,
-                    withconf=args.with_conf)
+        preds = recognise_one(args, model, im_descr, transform)
+        save_output(fname, [preds])
         predictions.append(preds)
     return predictions
 
 
 def start_main():
     args = process_args_extended().parse_args()
-    fname = handle_paths(args, args.with_conf)
+    fname = handle_paths(args)
     results = recognise_multiple(args, fname)
 
 
