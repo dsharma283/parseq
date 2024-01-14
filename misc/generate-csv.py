@@ -9,6 +9,8 @@ def process_args():
                         help='path to recognition new-format output files')
     parser.add_argument('--output', '-o', required=False, default=f'./results',
                         help='Output directory to save the predictions')
+    parser.add_argument('--with-prob', '-p', required=False, action='store_true', default=False,
+                        help='The input format is recognition with probability vector')
     return parser
 
 def generate_datafram(args):
@@ -20,7 +22,10 @@ def generate_datafram(args):
     flist = os.listdir(args.input)
     flist = [item for item in flist if item.endswith('.txt')]
 
-    df = pd.DataFrame(columns=['Scene_Image_name', 'Word_image_filename', 'Language', 'Recognition'])
+    if args.with_prob:
+        df = pd.DataFrame(columns=['Scene_Image_name', 'Word_image_filename', 'Probability', 'Recognition'])
+    else:
+        df = pd.DataFrame(columns=['Scene_Image_name', 'Word_image_filename', 'Language', 'Recognition'])
     pbar = tqdm.tqdm(flist)
     for idx, img in enumerate(pbar):
         pbar.set_postfix_str(img)
@@ -37,15 +42,24 @@ def generate_datafram(args):
             if os.path.exists(wimg_fname) is False:
                 wimg_base = ''
                 wimg_fname = ''
-
-            lang = items[-2]
-            pred = items[-3]
-            entry = {
-                        'Scene_Image_name': simg_fname,
-                        'Word_image_filename': wimg_fname,
-                        'Language': lang,
-                        'Recognition': pred,
-                    }
+            if args.with_prob:
+                pred = items[-2]
+                probs = f','.join(items[:-2])
+                entry = {
+                            'Scene_Image_name': simg_fname,
+                            'Word_image_filename': wimg_fname,
+                            'Probability': probs,
+                            'Recognition': pred,
+                        }
+            else:
+                pred = items[-3]
+                lang = items[-2]
+                entry = {
+                            'Scene_Image_name': simg_fname,
+                            'Word_image_filename': wimg_fname,
+                            'Language': lang,
+                            'Recognition': pred,
+                        }
             tdf = pd.DataFrame(entry, index=[0])
             df = pd.concat([df, tdf], ignore_index=True)
     return df
