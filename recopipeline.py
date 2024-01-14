@@ -122,7 +122,8 @@ def recognise_one(model, im_descr, transform):
             continue
         text, probs = predict_text(model, transform, crop)
         prediction.append([idx, bb, text])
-    return {"image": imname, "prediction": prediction}
+    return {"image": imname,
+            "prediction": sorted(prediction, key=lambda x : int(x[0]))}
 
 
 def recognise_one_with_scriptid(args, im_descr):
@@ -163,7 +164,8 @@ def recognise_one_with_scriptid(args, im_descr):
             elif args.force_unknown and crop:
                 text, probs = handle_unknown_forced(crop, conf, classmap, args.checkpoint)
             prediction.append([bbid, bb, text, key, conf])
-    return {"image": imname, "prediction": sorted(prediction, key=lambda x : int(x[0]))}
+    return {"image": imname,
+            "prediction": sorted(prediction, key=lambda x : int(x[0]))}
 
 
 def recognise_multiple(args, fname):
