@@ -100,7 +100,7 @@ def predict_text(model, xform, crop):
     probs = logits.softmax(-1)
     preds, probs = model.tokenizer.decode(probs)
     text = model.charset_adapter(preds[0])
-    return text
+    return text, probs[0].detach().to('cpu').numpy()
 
 
 def handle_unknown_forced(crop, cnf, classmap, ckpt_path):
@@ -120,7 +120,7 @@ def recognise_one(model, im_descr, transform):
             crop = generate_crop(im, bb)
         except:
             continue
-        text = predict_text(model, transform, crop)
+        text, probs = predict_text(model, transform, crop)
         prediction.append([idx, bb, text])
     return {"image": imname, "prediction": prediction}
 
@@ -159,9 +159,9 @@ def recognise_one_with_scriptid(args, im_descr):
             except:
                 crop = None
             if key != 'unknown':
-                text = predict_text(model, transform, crop)
+                text, probs = predict_text(model, transform, crop)
             elif args.force_unknown and crop:
-                text = handle_unknown_forced(crop, conf, classmap, args.checkpoint)
+                text, probs = handle_unknown_forced(crop, conf, classmap, args.checkpoint)
             prediction.append([bbid, bb, text, key, conf])
     return {"image": imname, "prediction": sorted(prediction, key=lambda x : int(x[0]))}
 
